@@ -8,8 +8,6 @@
   <meta name="theme-color" content="#0f172a" />
   <title>Oppgaveliste</title>
 
-  <link rel="manifest" href='data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Oppgaveliste%22%2C%22short_name%22%3A%22Oppgaver%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f8fafc%22%2C%22theme_color%22%3A%22%230f172a%22%7D' />
-
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
@@ -69,7 +67,8 @@
     <div id="taskList" class="space-y-2.5"></div>
   </main>
 
-  <div id="settingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+  <!-- INNSTILLINGSMODAL (Fikset visning) -->
+  <div id="settingsModal" style="display: none;" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4">
       <div class="flex justify-between items-center">
         <h2 class="text-lg font-bold text-slate-900">Enhet & Synkronisering</h2>
@@ -117,7 +116,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'oppgaveapp_state_v1';
+    const STORAGE_KEY = 'oppgaveapp_state_v2';
     const DEVICE_KEY = 'oppgaveapp_device_name';
     const SYNC_KEY = 'oppgaveapp_sync_code';
 
@@ -166,4 +165,294 @@
       return true;
     }
 
-    setInterval
+    setInterval(() => checkMidnightRollover(false), 30000);
+
+    function connectSync() {
+      const statusEl = document.getElementById('syncStatus');
+      if (!syncCode) {
+        statusEl.textContent = 'Mangler kode';
+        statusEl.className = 'text-[11px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium';
+        return;
+      }
+
+      if (mqttClient) { try { mqttClient.end(true); } catch (e) {} }
+
+      statusEl.textContent = 'Kobler til...';
+      statusEl.className = 'text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium';
+
+      const cleanCode = syncCode.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+      const topic = 'familie-oppgaver-sync-2026/' + cleanCode + '/state';
+
+      mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+        clientId: 'oppg_' + Math.random().toString(16).slice(2, 10),
+        clean: true,
+        connectTimeout: 5000,
+        reconnectPeriod: 3000
+      });
+
+      mqttClient.on('connect', () => {
+        statusEl.textContent = '🟢 Synkronisert';
+        statusEl.className = 'text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium';
+        mqttClient.subscribe(topic, { qos: 1 }, () => {
+          setTimeout(() => { if (appState.updatedAt > 0) publishState(); }, 1200);
+        });
+      });
+
+      mqttClient.on('message', (receivedTopic, message) => {
+        try {
+          const incoming = JSON.parse(message.toString());
+          if (incoming && incoming.updatedAt > appState.updatedAt) {
+            appState = incoming;
+            checkMidnightRollover(false);
+            saveLocalState();
+            render();
+          } else if (incoming && appState.updatedAt > incoming.updatedAt) {
+            publishState();
+          }
+        } catch (err) {}
+      });
+
+      mqttClient.on('offline', () => {
+        statusEl.textContent = 'Frakoblet...';
+        statusEl.className = 'text-[11px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-medium';
+      });
+    }
+
+    function publishState() {
+      if (!mqttClient || !mqttClient.connected || !syncCode) return;
+      const cleanCode = syncCode.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+      const topic = 'familie-oppgaver-sync-2026/' + cleanCode + '/state';
+      mqttClient.publish(topic, JSON.stringify(appState), { qos: 1, retain: true });
+    }
+
+    function handleAddTask(e) {
+      e.preventDefault();
+      if (!deviceName) { openSettings(); return; }
+      const input = document.getElementById('taskInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const newTask = {
+        id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        text: text,
+        category: currentTab,
+        completed: false,
+        completedBy: null,
+        completedAt: null,
+        isOverdue: false,
+        createdBy: deviceName,
+        createdAt: getTimeStr()
+      };
+
+      appState.tasks.unshift(newTask);
+      appState.updatedAt = Date.now();
+      input.value = '';
+
+      saveLocalState();
+      publishState();
+      render();
+    }
+
+    function toggleTask(id) {
+      if (!deviceName) { openSettings(); return; }
+      appState.tasks = appState.tasks.map(t => {
+        if (t.id !== id) return t;
+        const nowCompleted = !t.completed;
+        return {
+          ...t,
+          completed: nowCompleted,
+          completedBy: nowCompleted ? deviceName : null,
+          completedAt: nowCompleted ? getTimeStr() : null
+        };
+      });
+      appState.updatedAt = Date.now();
+      saveLocalState();
+      publishState();
+      render();
+    }
+
+    function deleteTask(id) {
+      appState.tasks = appState.tasks.filter(t => t.id !== id);
+      appState.updatedAt = Date.now();
+      saveLocalState();
+      publishState();
+      render();
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      render();
+    }
+
+    function openSettings() {
+      document.getElementById('deviceNameInput').value = deviceName;
+      document.getElementById('syncCodeInput').value = syncCode;
+      renderKnownDevices();
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+
+    function closeSettings() {
+      if (!deviceName) { alert('Du må skrive inn et navn.'); return; }
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+
+    function selectKnownDevice(name) {
+      document.getElementById('deviceNameInput').value = name;
+    }
+
+    function renderKnownDevices() {
+      const container = document.getElementById('knownDevicesContainer');
+      const devices = appState.devices || [];
+      if (devices.length === 0) { container.innerHTML = ''; return; }
+      container.innerHTML = '<span class="text-[11px] text-slate-400 w-full">Tidligere enheter:</span>' +
+        devices.map(d => `
+          <button type="button" onclick="selectKnownDevice('${d.replace(/'/g, "\\'")}')"
+            class="text-xs px-2.5 py-1 rounded-lg border ${d === deviceName ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'}">
+            📱 ${escapeHtml(d)}
+          </button>
+        `).join('');
+    }
+
+    function saveSettings() {
+      const nameVal = document.getElementById('deviceNameInput').value.trim();
+      const codeVal = document.getElementById('syncCodeInput').value.trim();
+
+      if (!nameVal) { alert('Skriv inn et navn.'); return; }
+
+      deviceName = nameVal;
+      syncCode = codeVal;
+
+      localStorage.setItem(DEVICE_KEY, deviceName);
+      localStorage.setItem(SYNC_KEY, syncCode);
+
+      if (!appState.devices) appState.devices = [];
+      if (!appState.devices.includes(deviceName)) {
+        appState.devices.push(deviceName);
+      }
+
+      appState.updatedAt = Date.now();
+      saveLocalState();
+      closeSettings();
+      connectSync();
+      publishState();
+      render();
+    }
+
+    function simulateMidnight() {
+      checkMidnightRollover(true);
+      closeSettings();
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function render() {
+      document.getElementById('currentDeviceLabel').textContent = deviceName || 'Velg navn';
+
+      const d = new Date();
+      const datoTekst = d.toLocaleDateString('no-NO', { weekday: 'long', day: 'numeric', month: 'long' });
+      document.getElementById('dateSubtitle').textContent = datoTekst.charAt(0).toUpperCase() + datoTekst.slice(1);
+
+      const dailyTasks = appState.tasks.filter(t => t.category === 'daily');
+      const weeklyTasks = appState.tasks.filter(t => t.category === 'weekly');
+
+      document.getElementById('badgeDaily').textContent = dailyTasks.filter(t => !t.completed).length;
+      document.getElementById('badgeWeekly').textContent = weeklyTasks.filter(t => !t.completed).length;
+
+      const tabDaily = document.getElementById('tabDaily');
+      const tabWeekly = document.getElementById('tabWeekly');
+
+      if (currentTab === 'daily') {
+        tabDaily.className = 'flex-1 py-2 rounded-xl text-sm font-semibold transition bg-white text-slate-900 shadow-sm';
+        tabWeekly.className = 'flex-1 py-2 rounded-xl text-sm font-semibold transition text-slate-300 hover:bg-slate-800';
+      } else {
+        tabWeekly.className = 'flex-1 py-2 rounded-xl text-sm font-semibold transition bg-white text-slate-900 shadow-sm';
+        tabDaily.className = 'flex-1 py-2 rounded-xl text-sm font-semibold transition text-slate-300 hover:bg-slate-800';
+      }
+
+      const visibleTasks = (currentTab === 'daily' ? dailyTasks : weeklyTasks).sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        return 0;
+      });
+
+      const listEl = document.getElementById('taskList');
+
+      if (visibleTasks.length === 0) {
+        listEl.innerHTML = `
+          <div class="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center text-slate-400">
+            <p class="text-sm font-medium">Ingen oppgaver her enda.</p>
+            <p class="text-xs mt-1">Skriv inn en oppgave i feltet over for å starte.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = visibleTasks.map(t => {
+        let cardStyle = 'bg-white border-slate-200';
+        let titleStyle = 'text-slate-800 font-medium';
+        let statusBadge = '';
+
+        if (t.completed) {
+          cardStyle = 'bg-emerald-50/90 border-emerald-300';
+          titleStyle = 'line-through text-emerald-900/60 font-medium';
+          statusBadge = `
+            <div class="mt-1.5 inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-lg">
+              ✓ Gjort av ${escapeHtml(t.completedBy)} kl. ${escapeHtml(t.completedAt)}
+            </div>
+          `;
+        } else if (t.isOverdue) {
+          cardStyle = 'bg-red-50 border-red-400 ring-1 ring-red-400/50';
+          titleStyle = 'text-red-900 font-bold';
+          statusBadge = `
+            <div class="mt-1.5 inline-flex items-center gap-1 bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-md">
+              ⚠️ Overført fra i går – ikke gjort!
+            </div>
+          `;
+        }
+
+        return `
+          <div class="p-3.5 rounded-2xl border shadow-xs transition flex items-start gap-3 ${cardStyle}">
+            <button
+              onclick="toggleTask('${t.id}')"
+              class="mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
+                t.completed
+                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                  : t.isOverdue
+                  ? 'border-red-500 bg-white'
+                  : 'border-slate-300 bg-slate-50'
+              }"
+            >
+              ${t.completed ? '✓' : ''}
+            </button>
+
+            <div class="flex-1 min-w-0" onclick="toggleTask('${t.id}')">
+              <p class="text-sm break-words ${titleStyle}">${escapeHtml(t.text)}</p>
+              ${statusBadge}
+            </div>
+
+            <button
+              onclick="deleteTask('${t.id}')"
+              class="text-slate-300 hover:text-red-500 px-1.5 py-0.5 text-sm"
+              title="Slett"
+            >
+              🗑️
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    checkMidnightRollover(false);
+    render();
+    connectSync();
+
+    if (!deviceName || !syncCode) {
+      openSettings();
+    }
+  </script>
+</body>
+</html>
