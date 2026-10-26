@@ -138,4 +138,82 @@
       </div>
 
       <div class="pt-2 border-t border-slate-100 flex flex-col gap-2">
-        <button onclick="saveSettingsModal()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl text-
+        <button onclick="saveSettingsModal()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition">
+          Lagre synkronisering
+        </button>
+
+        <button onclick="simulateMidnight()" class="w-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-medium py-2 rounded-xl text-xs transition">
+          🌙 Test midnatt-skifte nå (Slett ferdige & merk ugjorte rødt)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'oppgaveapp_state_v5';
+    const DEVICE_KEY = 'oppgaveapp_device_name';
+    const COLOR_KEY = 'oppgaveapp_device_color';
+    const SYNC_KEY = 'oppgaveapp_sync_code';
+
+    let currentTab = 'daily';
+    let deviceName = localStorage.getItem(DEVICE_KEY) || '';
+    let deviceColor = localStorage.getItem(COLOR_KEY) || 'blue';
+    let syncCode = localStorage.getItem(SYNC_KEY) || '';
+    let mqttClient = null;
+
+    let appState = loadLocalState();
+
+    function getTodayStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function getTimeStr() {
+      const d = new Date();
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function loadLocalState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.tasks)) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+      return { updatedAt: 0, lastDate: getTodayStr(), tasks: [] };
+    }
+
+    function saveLocalState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+    }
+
+    function checkMidnightRollover(force = false) {
+      const today = getTodayStr();
+      if (!force && appState.lastDate === today) return false;
+
+      appState.tasks = appState.tasks
+        .filter(t => !t.completed)
+        .map(t => ({ ...t, isOverdue: true }));
+
+      appState.lastDate = today;
+      appState.updatedAt = Date.now();
+      saveLocalState();
+      publishState();
+      render();
+      return true;
+    }
+
+    setInterval(() => checkMidnightRollover(false), 30000);
+
+    function connectSync() {
+      const statusEl = document.getElementById('syncStatus');
+      if (!syncCode) {
+        statusEl.textContent = 'Mangler kode';
+        statusEl.className = 'text-[11px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium';
+        return;
+      }
+
+      if (mqttClient) { try { mqttClient.end(true); }
