@@ -34,7 +34,7 @@
       </div>
 
       <button onclick="openSettings()" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 transition px-3 py-1.5 rounded-xl border border-slate-700 text-sm">
-        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span id="headerColorDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
         <span id="currentDeviceLabel" class="font-medium">Velg navn</span>
         <span class="text-slate-400 text-xs">⚙️</span>
       </button>
@@ -67,7 +67,7 @@
     <div id="taskList" class="space-y-2.5"></div>
   </main>
 
-  <!-- INNSTILLINGSMODAL (Fikset visning) -->
+  <!-- INNSTILLINGSMODAL MED FARGEVALG -->
   <div id="settingsModal" style="display: none;" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4">
       <div class="flex justify-between items-center">
@@ -85,12 +85,24 @@
           placeholder="Skriv eget navn (f.eks. Aksel)"
           class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
         />
-        <div id="knownDevicesContainer" class="mt-2 flex flex-wrap gap-1.5"></div>
       </div>
 
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-          2. Felles synkroniseringskode (for enhetene)
+          2. Velg din fargekode (unntatt rød)
+        </label>
+        <div class="flex gap-3 py-1" id="colorPickerContainer">
+          <button type="button" onclick="selectColor('blue')" data-color="blue" class="w-8 h-8 rounded-full bg-blue-500 ring-offset-2 focus:ring-2 focus:ring-blue-500 transition"></button>
+          <button type="button" onclick="selectColor('emerald')" data-color="emerald" class="w-8 h-8 rounded-full bg-emerald-500 ring-offset-2 focus:ring-2 focus:ring-emerald-500 transition"></button>
+          <button type="button" onclick="selectColor('purple')" data-color="purple" class="w-8 h-8 rounded-full bg-purple-500 ring-offset-2 focus:ring-2 focus:ring-purple-500 transition"></button>
+          <button type="button" onclick="selectColor('amber')" data-color="amber" class="w-8 h-8 rounded-full bg-amber-500 ring-offset-2 focus:ring-2 focus:ring-amber-500 transition"></button>
+          <button type="button" onclick="selectColor('pink')" data-color="pink" class="w-8 h-8 rounded-full bg-pink-500 ring-offset-2 focus:ring-2 focus:ring-pink-500 transition"></button>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+          3. Felles synkroniseringskode (for enhetene)
         </label>
         <input
           id="syncCodeInput"
@@ -98,9 +110,6 @@
           placeholder="F.eks. familie-2026"
           class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
         />
-        <p class="text-[11px] text-slate-500 mt-1">
-          Skriv inn nøyaktig samme kodeord på alle enhetene for å dele oppgavene.
-        </p>
       </div>
 
       <div class="pt-2 border-t border-slate-100 flex flex-col gap-2">
@@ -116,12 +125,14 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'oppgaveapp_state_v2';
+    const STORAGE_KEY = 'oppgaveapp_state_v3';
     const DEVICE_KEY = 'oppgaveapp_device_name';
+    const COLOR_KEY = 'oppgaveapp_device_color';
     const SYNC_KEY = 'oppgaveapp_sync_code';
 
     let currentTab = 'daily';
     let deviceName = localStorage.getItem(DEVICE_KEY) || '';
+    let deviceColor = localStorage.getItem(COLOR_KEY) || 'blue';
     let syncCode = localStorage.getItem(SYNC_KEY) || '';
     let mqttClient = null;
 
@@ -142,7 +153,7 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
-      return { updatedAt: 0, lastDate: getTodayStr(), devices: [], tasks: [] };
+      return { updatedAt: 0, lastDate: getTodayStr(), devices: {}, tasks: [] };
     }
 
     function saveLocalState() {
@@ -241,6 +252,7 @@
         completedAt: null,
         isOverdue: false,
         createdBy: deviceName,
+        creatorColor: deviceColor,
         createdAt: getTimeStr()
       };
 
@@ -287,7 +299,7 @@
     function openSettings() {
       document.getElementById('deviceNameInput').value = deviceName;
       document.getElementById('syncCodeInput').value = syncCode;
-      renderKnownDevices();
+      highlightSelectedColor(deviceColor);
       document.getElementById('settingsModal').style.display = 'flex';
     }
 
@@ -296,21 +308,20 @@
       document.getElementById('settingsModal').style.display = 'none';
     }
 
-    function selectKnownDevice(name) {
-      document.getElementById('deviceNameInput').value = name;
+    function selectColor(color) {
+      deviceColor = color;
+      highlightSelectedColor(color);
     }
 
-    function renderKnownDevices() {
-      const container = document.getElementById('knownDevicesContainer');
-      const devices = appState.devices || [];
-      if (devices.length === 0) { container.innerHTML = ''; return; }
-      container.innerHTML = '<span class="text-[11px] text-slate-400 w-full">Tidligere enheter:</span>' +
-        devices.map(d => `
-          <button type="button" onclick="selectKnownDevice('${d.replace(/'/g, "\\'")}')"
-            class="text-xs px-2.5 py-1 rounded-lg border ${d === deviceName ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'}">
-            📱 ${escapeHtml(d)}
-          </button>
-        `).join('');
+    function highlightSelectedColor(color) {
+      const buttons = document.querySelectorAll('#colorPickerContainer button');
+      buttons.forEach(btn => {
+        if (btn.dataset.color === color) {
+          btn.classList.add('ring-4', 'ring-slate-900', 'scale-110');
+        } else {
+          btn.classList.remove('ring-4', 'ring-slate-900', 'scale-110');
+        }
+      });
     }
 
     function saveSettings() {
@@ -323,12 +334,8 @@
       syncCode = codeVal;
 
       localStorage.setItem(DEVICE_KEY, deviceName);
+      localStorage.setItem(COLOR_KEY, deviceColor);
       localStorage.setItem(SYNC_KEY, syncCode);
-
-      if (!appState.devices) appState.devices = [];
-      if (!appState.devices.includes(deviceName)) {
-        appState.devices.push(deviceName);
-      }
 
       appState.updatedAt = Date.now();
       saveLocalState();
@@ -343,6 +350,16 @@
       closeSettings();
     }
 
+    function getColorHex(c) {
+      switch(c) {
+        case 'emerald': return '#10b981';
+        case 'purple': return '#a855f7';
+        case 'amber': return '#f59e0b';
+        case 'pink': return '#ec4899';
+        default: return '#3b82f6'; // blue
+      }
+    }
+
     function escapeHtml(str) {
       return String(str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -351,6 +368,7 @@
 
     function render() {
       document.getElementById('currentDeviceLabel').textContent = deviceName || 'Velg navn';
+      document.getElementById('headerColorDot').style.backgroundColor = getColorHex(deviceColor);
 
       const d = new Date();
       const datoTekst = d.toLocaleDateString('no-NO', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -395,6 +413,7 @@
         let cardStyle = 'bg-white border-slate-200';
         let titleStyle = 'text-slate-800 font-medium';
         let statusBadge = '';
+        let leftBorderColor = getColorHex(t.creatorColor || 'blue');
 
         if (t.completed) {
           cardStyle = 'bg-emerald-50/90 border-emerald-300';
@@ -407,6 +426,7 @@
         } else if (t.isOverdue) {
           cardStyle = 'bg-red-50 border-red-400 ring-1 ring-red-400/50';
           titleStyle = 'text-red-900 font-bold';
+          leftBorderColor = '#ef4444'; // Rød hvis ikke gjort og overført
           statusBadge = `
             <div class="mt-1.5 inline-flex items-center gap-1 bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-md">
               ⚠️ Overført fra i går – ikke gjort!
@@ -415,7 +435,7 @@
         }
 
         return `
-          <div class="p-3.5 rounded-2xl border shadow-xs transition flex items-start gap-3 ${cardStyle}">
+          <div class="p-3.5 rounded-2xl border shadow-xs transition flex items-start gap-3 relative overflow-hidden ${cardStyle}" style="border-left: 6px solid ${leftBorderColor};">
             <button
               onclick="toggleTask('${t.id}')"
               class="mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
@@ -431,6 +451,7 @@
 
             <div class="flex-1 min-w-0" onclick="toggleTask('${t.id}')">
               <p class="text-sm break-words ${titleStyle}">${escapeHtml(t.text)}</p>
+              <div class="text-[11px] text-slate-400 mt-0.5">Lagt til av: ${escapeHtml(t.createdBy || 'Ukjent')}</div>
               ${statusBadge}
             </div>
 
