@@ -33,19 +33,11 @@
         <p id="dateSubtitle" class="text-xs text-slate-400 mt-0.5"></p>
       </div>
 
-      <!-- TO SEPARATE KNAPPER ØVERST -->
-      <div class="flex items-center gap-1.5">
-        <!-- 1. Navneknapp -->
-        <button onclick="openNameModal()" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 transition px-3 py-1.5 rounded-xl border border-slate-700 text-sm">
-          <span id="headerColorDot" class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-          <span id="currentDeviceLabel" class="font-medium">Velg navn</span>
-        </button>
-
-        <!-- 2. Tannhjul-knapp for synk og innstillinger -->
-        <button onclick="openSettingsModal()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 transition px-2.5 py-1.5 rounded-xl border border-slate-700 text-sm" title="Synkronisering og innstillinger">
-          ⚙️
-        </button>
-      </div>
+      <button onclick="openSettings()" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 transition px-3 py-1.5 rounded-xl border border-slate-700 text-sm">
+        <span id="headerColorDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span id="currentDeviceLabel" class="font-medium">Velg navn</span>
+        <span class="text-slate-400 text-xs">⚙️</span>
+      </button>
     </div>
 
     <div class="max-w-md mx-auto px-4 pb-2 flex gap-2">
@@ -75,56 +67,42 @@
     <div id="taskList" class="space-y-2.5"></div>
   </main>
 
-  <!-- MODAL 1: NAVN OG FARGEVALG -->
-  <div id="nameModal" style="display: none;" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <!-- INNSTILLINGSMODAL MED FARGEVALG -->
+  <div id="settingsModal" style="display: none;" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4">
       <div class="flex justify-between items-center">
-        <h2 class="text-lg font-bold text-slate-900">Ditt navn og farge</h2>
-        <button onclick="closeNameModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold px-2">✕</button>
+        <h2 class="text-lg font-bold text-slate-900">Enhet & Synkronisering</h2>
+        <button onclick="closeSettings()" class="text-slate-400 hover:text-slate-600 text-xl font-bold px-2">✕</button>
       </div>
 
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-          Hva heter du?
+          1. Hva heter denne enheten / brukeren?
         </label>
         <input
           id="deviceNameInput"
           type="text"
-          placeholder="F.eks. Aksel"
+          placeholder="Skriv eget navn (f.eks. Aksel)"
           class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
         />
       </div>
 
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-          Velg din fargekode (unntatt rød)
+          2. Velg din fargekode (unntatt rød)
         </label>
         <div class="flex gap-3 py-1" id="colorPickerContainer">
-          <button type="button" onclick="selectColor('blue')" data-color="blue" class="w-8 h-8 rounded-full bg-blue-500 ring-offset-2 transition"></button>
-          <button type="button" onclick="selectColor('emerald')" data-color="emerald" class="w-8 h-8 rounded-full bg-emerald-500 ring-offset-2 transition"></button>
-          <button type="button" onclick="selectColor('purple')" data-color="purple" class="w-8 h-8 rounded-full bg-purple-500 ring-offset-2 transition"></button>
-          <button type="button" onclick="selectColor('amber')" data-color="amber" class="w-8 h-8 rounded-full bg-amber-500 ring-offset-2 transition"></button>
-          <button type="button" onclick="selectColor('pink')" data-color="pink" class="w-8 h-8 rounded-full bg-pink-500 ring-offset-2 transition"></button>
+          <button type="button" onclick="selectColor('blue')" data-color="blue" class="w-8 h-8 rounded-full bg-blue-500 ring-offset-2 focus:ring-2 focus:ring-blue-500 transition"></button>
+          <button type="button" onclick="selectColor('emerald')" data-color="emerald" class="w-8 h-8 rounded-full bg-emerald-500 ring-offset-2 focus:ring-2 focus:ring-emerald-500 transition"></button>
+          <button type="button" onclick="selectColor('purple')" data-color="purple" class="w-8 h-8 rounded-full bg-purple-500 ring-offset-2 focus:ring-2 focus:ring-purple-500 transition"></button>
+          <button type="button" onclick="selectColor('amber')" data-color="amber" class="w-8 h-8 rounded-full bg-amber-500 ring-offset-2 focus:ring-2 focus:ring-amber-500 transition"></button>
+          <button type="button" onclick="selectColor('pink')" data-color="pink" class="w-8 h-8 rounded-full bg-pink-500 ring-offset-2 focus:ring-2 focus:ring-pink-500 transition"></button>
         </div>
-      </div>
-
-      <button onclick="saveNameModal()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition">
-        Lagre navn og farge
-      </button>
-    </div>
-  </div>
-
-  <!-- MODAL 2: SYNKRONISERING OG INNSTILLINGER (Tannhjul) -->
-  <div id="settingsModal" style="display: none;" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-lg font-bold text-slate-900">Synkronisering</h2>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold px-2">✕</button>
       </div>
 
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-          Felles synkroniseringskode (for enhetene)
+          3. Felles synkroniseringskode (for enhetene)
         </label>
         <input
           id="syncCodeInput"
@@ -132,14 +110,11 @@
           placeholder="F.eks. familie-2026"
           class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
         />
-        <p class="text-[11px] text-slate-500 mt-1">
-          Skriv inn nøyaktig samme kodeord på alle enhetene for å dele oppgavene.
-        </p>
       </div>
 
       <div class="pt-2 border-t border-slate-100 flex flex-col gap-2">
-        <button onclick="saveSettingsModal()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition">
-          Lagre synkronisering
+        <button onclick="saveSettings()" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition">
+          Lagre og koble til
         </button>
 
         <button onclick="simulateMidnight()" class="w-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-medium py-2 rounded-xl text-xs transition">
@@ -150,7 +125,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'oppgaveapp_state_v4';
+    const STORAGE_KEY = 'oppgaveapp_state_v3';
     const DEVICE_KEY = 'oppgaveapp_device_name';
     const COLOR_KEY = 'oppgaveapp_device_color';
     const SYNC_KEY = 'oppgaveapp_sync_code';
@@ -178,7 +153,7 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
-      return { updatedAt: 0, lastDate: getTodayStr(), tasks: [] };
+      return { updatedAt: 0, lastDate: getTodayStr(), devices: {}, tasks: [] };
     }
 
     function saveLocalState() {
@@ -263,7 +238,7 @@
 
     function handleAddTask(e) {
       e.preventDefault();
-      if (!deviceName) { openNameModal(); return; }
+      if (!deviceName) { openSettings(); return; }
       const input = document.getElementById('taskInput');
       const text = input.value.trim();
       if (!text) return;
@@ -291,7 +266,7 @@
     }
 
     function toggleTask(id) {
-      if (!deviceName) { openNameModal(); return; }
+      if (!deviceName) { openSettings(); return; }
       appState.tasks = appState.tasks.map(t => {
         if (t.id !== id) return t;
         const nowCompleted = !t.completed;
@@ -321,16 +296,16 @@
       render();
     }
 
-    // Modal styring for Navn
-    function openNameModal() {
+    function openSettings() {
       document.getElementById('deviceNameInput').value = deviceName;
+      document.getElementById('syncCodeInput').value = syncCode;
       highlightSelectedColor(deviceColor);
-      document.getElementById('nameModal').style.display = 'flex';
+      document.getElementById('settingsModal').style.display = 'flex';
     }
 
-    function closeNameModal() {
+    function closeSettings() {
       if (!deviceName) { alert('Du må skrive inn et navn.'); return; }
-      document.getElementById('nameModal').style.display = 'none';
+      document.getElementById('settingsModal').style.display = 'none';
     }
 
     function selectColor(color) {
@@ -349,44 +324,30 @@
       });
     }
 
-    function saveNameModal() {
+    function saveSettings() {
       const nameVal = document.getElementById('deviceNameInput').value.trim();
+      const codeVal = document.getElementById('syncCodeInput').value.trim();
+
       if (!nameVal) { alert('Skriv inn et navn.'); return; }
 
       deviceName = nameVal;
+      syncCode = codeVal;
+
       localStorage.setItem(DEVICE_KEY, deviceName);
       localStorage.setItem(COLOR_KEY, deviceColor);
+      localStorage.setItem(SYNC_KEY, syncCode);
 
-      closeNameModal();
       appState.updatedAt = Date.now();
       saveLocalState();
+      closeSettings();
+      connectSync();
       publishState();
       render();
     }
 
-    // Modal styring for Tannhjul / Synkronisering
-    function openSettingsModal() {
-      document.getElementById('syncCodeInput').value = syncCode;
-      document.getElementById('settingsModal').style.display = 'flex';
-    }
-
-    function closeSettingsModal() {
-      document.getElementById('settingsModal').style.display = 'none';
-    }
-
-    function saveSettingsModal() {
-      const codeVal = document.getElementById('syncCodeInput').value.trim();
-      syncCode = codeVal;
-      localStorage.setItem(SYNC_KEY, syncCode);
-
-      closeSettingsModal();
-      connectSync();
-      publishState();
-    }
-
     function simulateMidnight() {
       checkMidnightRollover(true);
-      closeSettingsModal();
+      closeSettings();
     }
 
     function getColorHex(c) {
@@ -465,7 +426,7 @@
         } else if (t.isOverdue) {
           cardStyle = 'bg-red-50 border-red-400 ring-1 ring-red-400/50';
           titleStyle = 'text-red-900 font-bold';
-          leftBorderColor = '#ef4444'; // Rød hvis forfalt
+          leftBorderColor = '#ef4444'; // Rød hvis ikke gjort og overført
           statusBadge = `
             <div class="mt-1.5 inline-flex items-center gap-1 bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-md">
               ⚠️ Overført fra i går – ikke gjort!
@@ -510,8 +471,8 @@
     render();
     connectSync();
 
-    if (!deviceName) {
-      openNameModal();
+    if (!deviceName || !syncCode) {
+      openSettings();
     }
   </script>
 </body>
